@@ -145,39 +145,41 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             </div>
 
             {/* Footer with Surfboard Icon and Input */}
-            <div className="border-t border-border p-6 space-y-4">
-              {/* Surfboard Icon with Arrows */}
-              <div className="flex items-center justify-center gap-4">
-                <div className="flex-1 h-0.5 bg-foreground"></div>
-                <div className="text-foreground">
-                  <SurfboardIcon />
+            {currentView !== "loading" && (
+              <div className="border-t border-border p-6 space-y-4">
+                {/* Surfboard Icon with Arrows */}
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex-1 h-0.5 bg-foreground"></div>
+                  <div className="text-foreground">
+                    <SurfboardIcon />
+                  </div>
+                  <div className="flex-1 h-0.5 bg-foreground"></div>
                 </div>
-                <div className="flex-1 h-0.5 bg-foreground"></div>
-              </div>
 
-              {/* Input Field */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={
-                    isNewUser
-                      ? "Hacia donde quieres surfear hoy ..."
-                      : "A dónde quieres que nos lleve la ola ahora ..."
-                  }
-                  className="w-full px-4 py-4 pr-24 rounded-2xl border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  <button className="p-2 hover:bg-accent rounded-lg transition-colors">
-                    <Mic className="w-5 h-5" />
-                  </button>
-                  <button className="p-2 hover:bg-accent rounded-lg transition-colors">
-                    <Send className="w-5 h-5" />
-                  </button>
+                {/* Input Field */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder={
+                      isNewUser
+                        ? "Hacia donde quieres surfear hoy ..."
+                        : "A dónde quieres que nos lleve la ola ahora ..."
+                    }
+                    className="w-full px-4 py-4 pr-24 rounded-2xl border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+                      <Mic className="w-5 h-5" />
+                    </button>
+                    <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </motion.div>
         </>
       )}
