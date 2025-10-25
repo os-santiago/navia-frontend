@@ -9,8 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --test tests/unit/**/*.mjs",
-    "test:functional": "node --test tests/functional/**/*.mjs",
+    "test:unit": "node --test tests/unit/*.mjs",
+    "test:functional": "node --test tests/functional/*.mjs",
     "test": "npm run test:unit && npm run test:functional",
     "preview": "vite preview"
   },
