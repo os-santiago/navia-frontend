@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mic, Send } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NewUserView } from "./drawer-views/NewUserView";
 import { ReturningUserView } from "./drawer-views/ReturningUserView";
 import { ActionView } from "./drawer-views/ActionView";
+import { LoadingView } from "./drawer-views/LoadingView";
 
 interface NaviaDrawerProps {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface NaviaDrawerProps {
   isNewUser?: boolean;
 }
 
-export type DrawerView = "initial" | "action";
+export type DrawerView = "loading" | "initial" | "action";
 
 const SurfboardIcon = () => (
   <svg
@@ -41,9 +42,30 @@ const SurfboardIcon = () => (
 );
 
 export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerProps) => {
-  const [currentView, setCurrentView] = useState<DrawerView>("initial");
+  const [currentView, setCurrentView] = useState<DrawerView>("loading");
   const [selectedAction, setSelectedAction] = useState<string>("");
   const [inputValue, setInputValue] = useState("");
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
+  // Simulate backend data fetch when drawer opens
+  useEffect(() => {
+    if (isOpen && !isDataLoaded) {
+      setCurrentView("loading");
+      
+      // Simulate API call
+      setTimeout(() => {
+        // Mock backend response
+        console.log("Data fetched from backend:", {
+          userId: isNewUser ? "new-user-123" : "returning-user-456",
+          preferences: ["surf", "events"],
+          timestamp: new Date().toISOString(),
+        });
+        
+        setIsDataLoaded(true);
+        setCurrentView("initial");
+      }, 1500); // 1.5 second delay to simulate network request
+    }
+  }, [isOpen, isDataLoaded, isNewUser]);
 
   const handleActionSelect = (action: string) => {
     setSelectedAction(action);
@@ -59,9 +81,10 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     onClose();
     // Reset state after animation completes
     setTimeout(() => {
-      setCurrentView("initial");
+      setCurrentView("loading");
       setSelectedAction("");
       setInputValue("");
+      setIsDataLoaded(false);
     }, 300);
   };
 
@@ -105,7 +128,9 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              {currentView === "initial" ? (
+              {currentView === "loading" ? (
+                <LoadingView />
+              ) : currentView === "initial" ? (
                 isNewUser ? (
                   <NewUserView onActionSelect={handleActionSelect} />
                 ) : (
