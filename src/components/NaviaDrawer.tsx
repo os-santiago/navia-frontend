@@ -2,8 +2,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Mic, Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { NewUserView } from "./drawer-views/NewUserView";
-import { ReturningUserView } from "./drawer-views/ReturningUserView";
+import { RecentPrompts } from "./drawer-views/RecentPrompts";
 import { ActionView } from "./drawer-views/ActionView";
+import { getActionContent } from "./drawer-views/actionContent";
 import { LoadingView } from "./drawer-views/LoadingView";
 import { ProcessingView } from "./drawer-views/ProcessingView";
 import { FeatureNotAvailableModal } from "./FeatureNotAvailableModal";
@@ -15,6 +16,19 @@ interface NaviaDrawerProps {
 }
 
 export type DrawerView = "loading" | "initial" | "processing" | "action";
+
+type FeatureModalConfig = {
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+};
+
+interface PromptRecord {
+  prompt: string;
+  response: string;
+  actionId: string;
+  timestamp: string;
+}
 
 const SurfboardIcon = () => (
   <svg
@@ -50,46 +64,57 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
   const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [inputValue, setInputValue] = useState("");
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [isMicModalOpen, setIsMicModalOpen] = useState(false);
+  const [promptHistory, setPromptHistory] = useState<PromptRecord[]>([]);
+  const [featureModalConfig, setFeatureModalConfig] = useState<FeatureModalConfig | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
   const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInputDisabled = currentView === "processing";
+  const hasPromptHistory = promptHistory.length > 0;
+  const effectiveIsNewUser = !hasPromptHistory && isNewUser;
   const promptPlaceholder =
     currentView === "action"
       ? "A dónde quieres que nos lleve la ola ahora ..."
-      : isNewUser
+      : effectiveIsNewUser
         ? "Hacia donde quieres surfear hoy ..."
         : "A dónde quieres que nos lleve la ola ahora ...";
   const headerTitle =
     currentView === "loading"
       ? "Analizando página web"
       : currentView === "initial"
-        ? isNewUser
+        ? effectiveIsNewUser
           ? "Opciones de surf para hoy"
           : "Tus surfeos anteriores"
         : currentView === "processing"
           ? "Procesando tu prompt"
-          : "Ya estás surfeando en";
+          : "Ya estás surfeando en la web";
 
   // Simulate backend data fetch when drawer opens
   useEffect(() => {
-    if (isOpen && !isDataLoaded) {
-      setCurrentView("loading");
-      
+    if (!isOpen) {
+      return;
+    }
+
+    if (!isDataLoaded) {
+      if (currentView !== "loading") {
+        setCurrentView("loading");
+      }
+
       // Simulate API call
       setTimeout(() => {
         // Mock backend response
         console.log("Data fetched from backend:", {
-          userId: isNewUser ? "new-user-123" : "returning-user-456",
+          userId: effectiveIsNewUser ? "new-user-123" : "returning-user-456",
           preferences: ["surf", "events"],
           timestamp: new Date().toISOString(),
         });
-        
+
         setIsDataLoaded(true);
         setCurrentView("initial");
       }, 2000); // 2 second delay to simulate network request
+    } else if (currentView === "loading") {
+      setCurrentView("initial");
     }
-  }, [isOpen, isDataLoaded, isNewUser]);
+  }, [isOpen, isDataLoaded, isNewUser, effectiveIsNewUser, currentView]);
 
   const clearProcessingTimeout = () => {
     if (processingTimeoutRef.current) {
@@ -105,10 +130,23 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     setPromptError(null);
   };
 
+  const showFeatureNotAvailable = (config?: FeatureModalConfig) => {
+    setFeatureModalConfig(config ?? {});
+  };
+
   const handleBackToInitial = () => {
     clearProcessingTimeout();
     setCurrentView("initial");
     setSubmittedPrompt("");
+    setPromptError(null);
+  };
+
+  const handleClearHistory = () => {
+    setPromptHistory([]);
+    setSelectedActionId(null);
+    setPrefilledPrompt("");
+    setSubmittedPrompt("");
+    setInputValue("");
     setPromptError(null);
   };
 
@@ -124,14 +162,26 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       return;
     }
 
+    const actionIdToUse = selectedActionId ?? "custom";
+
     setSubmittedPrompt(trimmedPrompt);
-    if (!selectedActionId) {
-      setSelectedActionId("custom");
+    if (selectedActionId !== actionIdToUse) {
+      setSelectedActionId(actionIdToUse);
     }
     setInputValue("");
     clearProcessingTimeout();
     setCurrentView("processing");
     processingTimeoutRef.current = setTimeout(() => {
+      const content = getActionContent(actionIdToUse, trimmedPrompt);
+      setPromptHistory((prev) => [
+        ...prev,
+        {
+          prompt: trimmedPrompt,
+          response: content.description,
+          actionId: actionIdToUse,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
       setCurrentView("action");
       processingTimeoutRef.current = null;
     }, 1200);
@@ -158,18 +208,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
 
   const handleClose = () => {
     onClose();
-    // Reset state after animation completes
-    setTimeout(() => {
-      clearProcessingTimeout();
-      setCurrentView("loading");
-      setSelectedActionId(null);
-      setInputValue("");
-      setIsDataLoaded(false);
-      setIsMicModalOpen(false);
-      setPrefilledPrompt("");
-      setSubmittedPrompt("");
-      setPromptError(null);
-    }, 300);
+    setFeatureModalConfig(null);
+    setPromptError(null);
   };
 
   useEffect(() => {
@@ -216,12 +256,31 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             <div className="flex-1 overflow-y-auto p-6">
               {currentView === "loading" && <LoadingView />}
               {currentView === "initial" && (
-                isNewUser ? (
-                  <NewUserView onActionSelect={handleActionSelect} />
-                ) : (
-                  <ReturningUserView onActionSelect={handleActionSelect} />
-                )
-              )}
+                effectiveIsNewUser ? (
+                <NewUserView
+                  onActionSelect={handleActionSelect}
+                  onShowFeatureUnavailable={() =>
+                    showFeatureNotAvailable({
+                      description:
+                        "La opción de mostrar más alternativas estará disponible pronto. Sigue explorando otras acciones mientras tanto.",
+                    })
+                  }
+                />
+              ) : (
+                <div className="space-y-6">
+                  <RecentPrompts
+                    prompts={promptHistory.slice(-3).reverse()}
+                    onSelectPrompt={(prompt) => {
+                      setInputValue(prompt);
+                      setPrefilledPrompt(prompt);
+                      setPromptError(null);
+                      setSelectedActionId(null);
+                    }}
+                    onClear={handleClearHistory}
+                  />
+                </div>
+              )
+            )}
               {currentView === "processing" && (
                 <ProcessingView promptText={submittedPrompt || inputValue} />
               )}
@@ -260,7 +319,12 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     <button
                       className="p-2 hover:bg-accent rounded-lg transition-colors"
-                      onClick={() => setIsMicModalOpen(true)}
+                      onClick={() =>
+                        showFeatureNotAvailable({
+                          description:
+                            "La funcionalidad de micrófono aún no está implementada. Próximamente podrás dictar tus instrucciones desde aquí.",
+                        })
+                      }
                     >
                       <Mic className="w-5 h-5" />
                     </button>
@@ -283,9 +347,9 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             )}
           </motion.div>
           <FeatureNotAvailableModal
-            isOpen={isMicModalOpen}
-            onClose={() => setIsMicModalOpen(false)}
-            description="La funcionalidad de micrófono aún no está implementada. Próximamente podrás dictar tus prompts desde aquí."
+            isOpen={!!featureModalConfig}
+            onClose={() => setFeatureModalConfig(null)}
+            {...(featureModalConfig ?? {})}
           />
         </>
       )}

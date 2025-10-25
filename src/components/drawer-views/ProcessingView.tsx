@@ -19,7 +19,7 @@ export const ProcessingView = ({ promptText }: ProcessingViewProps) => {
             Procesando tu solicitud...
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Estamos preparando la mejor respuesta para tu prompt.
+            Estamos preparando la mejor respuesta para tu solicitud.
           </p>
         </div>
       </motion.div>

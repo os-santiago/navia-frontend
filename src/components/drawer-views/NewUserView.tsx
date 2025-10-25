@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 
 interface NewUserViewProps {
   onActionSelect: (actionId: string, actionLabel: string) => void;
+  onShowFeatureUnavailable: () => void;
 }
 
 const actionButtons = [
@@ -19,7 +20,7 @@ const actionButtons = [
   },
 ];
 
-export const NewUserView = ({ onActionSelect }: NewUserViewProps) => {
+export const NewUserView = ({ onActionSelect, onShowFeatureUnavailable }: NewUserViewProps) => {
   return (
     <div className="space-y-4">
       {actionButtons.map((button, index) => (
@@ -38,12 +39,15 @@ export const NewUserView = ({ onActionSelect }: NewUserViewProps) => {
       ))}
 
       <motion.button
+        type="button"
+        onClick={onShowFeatureUnavailable}
         className="w-full px-6 py-3 bg-[hsl(var(--button-primary))] text-white rounded-full hover:bg-[hsl(var(--button-secondary))] transition-colors font-medium mt-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        title="Funcionalidad aún no implementada"
       >
         Mostrar más alternativas
       </motion.button>
