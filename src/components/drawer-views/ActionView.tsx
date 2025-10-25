@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
 
 interface ActionViewProps {
   action: string;
   onBack: () => void;
+  promptText?: string;
 }
 
 const actionContent: Record<string, { title: string; description: string; buttons: string[] }> = {
@@ -45,12 +45,16 @@ const actionContent: Record<string, { title: string; description: string; button
   },
 };
 
-export const ActionView = ({ action, onBack }: ActionViewProps) => {
-  const content = actionContent[action] || {
-    title: "Acción seleccionada",
-    description: "Contenido de la acción en proceso...",
-    buttons: ["Continuar", "Empezar un nuevo surf"],
-  };
+export const ActionView = ({ action, onBack, promptText }: ActionViewProps) => {
+  const content =
+    actionContent[action] ||
+    {
+      title: promptText || "Acción seleccionada",
+      description: promptText
+        ? `Estamos procesando tu solicitud:\n\n"${promptText}"`
+        : "Contenido de la acción en proceso...",
+      buttons: ["Continuar", "Empezar un nuevo surf"],
+    };
 
   return (
     <motion.div
@@ -59,14 +63,6 @@ export const ActionView = ({ action, onBack }: ActionViewProps) => {
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
     >
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-primary hover:underline mb-4"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver
-      </button>
-
       <div className="bg-[hsl(var(--button-secondary))] text-white rounded-xl p-6">
         <h3 className="font-semibold mb-4">{content.title}</h3>
         <div className="mb-6">
@@ -78,19 +74,23 @@ export const ActionView = ({ action, onBack }: ActionViewProps) => {
       </div>
 
       <div className="space-y-3">
-        {content.buttons.map((buttonText, index) => (
-          <motion.button
-            key={index}
-            className="w-full px-6 py-3 bg-[hsl(var(--button-primary))] text-white rounded-full hover:bg-[hsl(var(--button-secondary))] transition-colors font-medium"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {buttonText}
-          </motion.button>
-        ))}
+        {content.buttons.map((buttonText, index) => {
+          const isRestartButton = buttonText === "Empezar un nuevo surf";
+          return (
+            <motion.button
+              key={index}
+              className="w-full px-6 py-3 bg-[hsl(var(--button-primary))] text-white rounded-full hover:bg-[hsl(var(--button-secondary))] transition-colors font-medium"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={isRestartButton ? onBack : undefined}
+            >
+              {buttonText}
+            </motion.button>
+          );
+        })}
       </div>
     </motion.div>
   );

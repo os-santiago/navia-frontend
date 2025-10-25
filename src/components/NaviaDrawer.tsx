@@ -1,10 +1,12 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mic, Send } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NewUserView } from "./drawer-views/NewUserView";
 import { ReturningUserView } from "./drawer-views/ReturningUserView";
 import { ActionView } from "./drawer-views/ActionView";
 import { LoadingView } from "./drawer-views/LoadingView";
+import { ProcessingView } from "./drawer-views/ProcessingView";
+import { FeatureNotAvailableModal } from "./FeatureNotAvailableModal";
 
 interface NaviaDrawerProps {
   isOpen: boolean;
@@ -12,7 +14,7 @@ interface NaviaDrawerProps {
   isNewUser?: boolean;
 }
 
-export type DrawerView = "loading" | "initial" | "action";
+export type DrawerView = "loading" | "initial" | "processing" | "action";
 
 const SurfboardIcon = () => (
   <svg
@@ -43,9 +45,31 @@ const SurfboardIcon = () => (
 
 export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerProps) => {
   const [currentView, setCurrentView] = useState<DrawerView>("loading");
-  const [selectedAction, setSelectedAction] = useState<string>("");
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  const [prefilledPrompt, setPrefilledPrompt] = useState("");
+  const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [inputValue, setInputValue] = useState("");
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isMicModalOpen, setIsMicModalOpen] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInputDisabled = currentView === "processing";
+  const promptPlaceholder =
+    currentView === "action"
+      ? "A dónde quieres que nos lleve la ola ahora ..."
+      : isNewUser
+        ? "Hacia donde quieres surfear hoy ..."
+        : "A dónde quieres que nos lleve la ola ahora ...";
+  const headerTitle =
+    currentView === "loading"
+      ? "Analizando página web"
+      : currentView === "initial"
+        ? isNewUser
+          ? "Opciones de surf para hoy"
+          : "Tus surfeos anteriores"
+        : currentView === "processing"
+          ? "Procesando tu prompt"
+          : "Ya estás surfeando en";
 
   // Simulate backend data fetch when drawer opens
   useEffect(() => {
@@ -63,30 +87,96 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         
         setIsDataLoaded(true);
         setCurrentView("initial");
-      }, 1500); // 1.5 second delay to simulate network request
+      }, 2000); // 2 second delay to simulate network request
     }
   }, [isOpen, isDataLoaded, isNewUser]);
 
-  const handleActionSelect = (action: string) => {
-    setSelectedAction(action);
-    setCurrentView("action");
+  const clearProcessingTimeout = () => {
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current);
+      processingTimeoutRef.current = null;
+    }
+  };
+
+  const handleActionSelect = (actionId: string, actionLabel: string) => {
+    setSelectedActionId(actionId);
+    setPrefilledPrompt(actionLabel);
+    setInputValue(actionLabel);
+    setPromptError(null);
   };
 
   const handleBackToInitial = () => {
+    clearProcessingTimeout();
     setCurrentView("initial");
-    setSelectedAction("");
+    setSubmittedPrompt("");
+    setPromptError(null);
+  };
+
+  const handleSendPrompt = () => {
+    const trimmedPrompt = inputValue.trim();
+    if (!trimmedPrompt) {
+      return;
+    }
+
+    const tokenPattern = /\[[^\]]+\]/g;
+    if (tokenPattern.test(trimmedPrompt)) {
+      setPromptError("Reemplaza los campos entre corchetes antes de enviar el prompt.");
+      return;
+    }
+
+    setSubmittedPrompt(trimmedPrompt);
+    if (!selectedActionId) {
+      setSelectedActionId("custom");
+    }
+    setInputValue("");
+    clearProcessingTimeout();
+    setCurrentView("processing");
+    processingTimeoutRef.current = setTimeout(() => {
+      setCurrentView("action");
+      processingTimeoutRef.current = null;
+    }, 1200);
+    setPromptError(null);
+  };
+
+  const handlePromptChange = (value: string) => {
+    setInputValue(value);
+    if (promptError) {
+      setPromptError(null);
+    }
+
+    if (value === "") {
+      setSelectedActionId(null);
+      setPrefilledPrompt("");
+      return;
+    }
+
+    if (prefilledPrompt && value !== prefilledPrompt) {
+      setSelectedActionId(null);
+      setPrefilledPrompt("");
+    }
   };
 
   const handleClose = () => {
     onClose();
     // Reset state after animation completes
     setTimeout(() => {
+      clearProcessingTimeout();
       setCurrentView("loading");
-      setSelectedAction("");
+      setSelectedActionId(null);
       setInputValue("");
       setIsDataLoaded(false);
+      setIsMicModalOpen(false);
+      setPrefilledPrompt("");
+      setSubmittedPrompt("");
+      setPromptError(null);
     }, 300);
   };
+
+  useEffect(() => {
+    return () => {
+      clearProcessingTimeout();
+    };
+  }, []);
 
   return (
     <AnimatePresence>
@@ -112,11 +202,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
               <h2 className="text-xl font-bold text-foreground">
-                {currentView === "initial" ? (
-                  isNewUser ? "Opciones de surf para hoy" : "Tus surfeos anteriores"
-                ) : (
-                  "Ya estás surfeando en"
-                )}
+                {headerTitle}
               </h2>
               <button
                 onClick={handleClose}
@@ -128,24 +214,28 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              {currentView === "loading" ? (
-                <LoadingView />
-              ) : currentView === "initial" ? (
+              {currentView === "loading" && <LoadingView />}
+              {currentView === "initial" && (
                 isNewUser ? (
                   <NewUserView onActionSelect={handleActionSelect} />
                 ) : (
                   <ReturningUserView onActionSelect={handleActionSelect} />
                 )
-              ) : (
-                <ActionView 
-                  action={selectedAction} 
+              )}
+              {currentView === "processing" && (
+                <ProcessingView promptText={submittedPrompt || inputValue} />
+              )}
+              {currentView === "action" && (
+                <ActionView
+                  action={selectedActionId ?? "custom"}
                   onBack={handleBackToInitial}
+                  promptText={submittedPrompt}
                 />
               )}
             </div>
 
             {/* Footer with Surfboard Icon and Input */}
-            {currentView !== "loading" && (
+            {currentView !== "loading" && currentView !== "processing" && (
               <div className="border-t border-border p-6 space-y-4">
                 {/* Surfboard Icon with Arrows */}
                 <div className="flex items-center justify-center gap-4">
@@ -158,29 +248,45 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
 
                 {/* Input Field */}
                 <div className="relative">
-                  <input
-                    type="text"
+                  <textarea
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={
-                      isNewUser
-                        ? "Hacia donde quieres surfear hoy ..."
-                        : "A dónde quieres que nos lleve la ola ahora ..."
-                    }
-                    className="w-full px-4 py-4 pr-24 rounded-2xl border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => handlePromptChange(e.target.value)}
+                    aria-invalid={promptError ? "true" : "false"}
+                    aria-describedby={promptError ? "prompt-error" : undefined}
+                    placeholder={promptPlaceholder}
+                    disabled={isInputDisabled}
+                    className="w-full min-h-32 max-h-64 px-4 py-4 pr-24 rounded-2xl border-2 border-foreground bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none overflow-y-auto disabled:opacity-70 disabled:cursor-not-allowed"
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+                    <button
+                      className="p-2 hover:bg-accent rounded-lg transition-colors"
+                      onClick={() => setIsMicModalOpen(true)}
+                    >
                       <Mic className="w-5 h-5" />
                     </button>
-                    <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+                    <button
+                      type="button"
+                      onClick={handleSendPrompt}
+                      disabled={isInputDisabled}
+                      className="p-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       <Send className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
+                {promptError && (
+                  <p id="prompt-error" className="text-sm text-destructive">
+                    {promptError}
+                  </p>
+                )}
               </div>
             )}
           </motion.div>
+          <FeatureNotAvailableModal
+            isOpen={isMicModalOpen}
+            onClose={() => setIsMicModalOpen(false)}
+            description="La funcionalidad de micrófono aún no está implementada. Próximamente podrás dictar tus prompts desde aquí."
+          />
         </>
       )}
     </AnimatePresence>

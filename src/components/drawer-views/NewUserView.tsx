@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 
 interface NewUserViewProps {
-  onActionSelect: (action: string) => void;
+  onActionSelect: (actionId: string, actionLabel: string) => void;
 }
 
 const actionButtons = [
@@ -25,7 +25,7 @@ export const NewUserView = ({ onActionSelect }: NewUserViewProps) => {
       {actionButtons.map((button, index) => (
         <motion.button
           key={button.id}
-          onClick={() => onActionSelect(button.id)}
+          onClick={() => onActionSelect(button.id, button.label)}
           className="w-full px-6 py-4 bg-[hsl(var(--button-secondary))] text-white rounded-xl hover:bg-[hsl(var(--button-primary))] transition-colors text-left font-medium"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
