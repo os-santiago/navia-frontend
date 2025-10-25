@@ -1,73 +1,99 @@
-# Welcome to your Lovable project
+# Navia Web App
 
-## Project info
+![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow?style=flat-square)
+![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61dafb?style=flat-square)
+![Pruebas](https://img.shields.io/badge/tests-node--test-blue?style=flat-square)
 
-**URL**: https://lovable.dev/projects/ac11c98f-ad20-41e1-89a9-9b4d782538f6
+Interfaz web de Navia, el asistente que ayuda a usuarios a descubrir y navegar eventos mediante una experiencia conversacional soportada en un drawer interactivo.
 
-## How can I edit this code?
+## Vision general
 
-There are several ways of editing your application.
+- Boton flotante siempre visible que activa el drawer de Navia.
+- Flujos diferenciados para primera visita y usuarios recurrentes.
+- Acciones guiadas con contenido dinamico y pistas contextuales para cada consulta.
+- Animaciones con framer-motion para brindar una experiencia fluida.
+- Integracion lista para consultas asincronas mediante React Query.
 
-**Use Lovable**
+## Stack principal
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ac11c98f-ad20-41e1-89a9-9b4d782538f6) and start prompting.
+- Vite + React 18 + TypeScript.
+- Tailwind CSS y componentes shadcn UI para el sistema visual.
+- framer-motion para animaciones y transiciones.
+- React Router para enrutamiento y vistas.
+- TanStack Query para manejo futuro de datos remotos.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Requisitos previos
 
-**Use your preferred IDE**
+- Node.js 20+ y npm 10+ (recomendado gestionar con [nvm](https://github.com/nvm-sh/nvm)).
+- Acceso al repositorio y permisos de lectura.
+- Opcional: bun instalado si prefieres su gestor, aunque los comandos documentados usan npm.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Instalacion
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+git clone <url-del-repo>
+cd navia-frontend
+npm install
+```
 
-Follow these steps:
+Si trabajas con bun:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+bun install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Desarrollo local
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Esto levanta Vite con recarga en caliente (por defecto en http://localhost:5173). El codigo fuente principal vive en `src/`, con `src/pages/Index.tsx` como punto de entrada de la experiencia y componentes compartidos dentro de `src/components/`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Scripts utiles
 
-**Use GitHub Codespaces**
+| Comando | Descripcion |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo con Vite y HMR. |
+| `npm run build` | Compilacion de produccion optimizada. |
+| `npm run build:dev` | Compilacion en modo development para depurar bundle. |
+| `npm run preview` | Sirve el build generado para pruebas manuales. |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Pruebas y calidad
 
-## What technologies are used for this project?
+- `npm run lint`: analiza el repositorio con ESLint.
+- `npm run typecheck`: valida los tipos con TypeScript sin emitir codigo.
+- `npm run test`: ejecuta las suites unitarias (`tests/unit/*.mjs`) y funcionales (`tests/functional/*.mjs`) usando node test.
+- `npm run test:unit`: solo pruebas unitarias.
+- `npm run test:functional`: solo pruebas funcionales.
 
-This project is built with:
+Se recomienda correr `lint`, `typecheck` y `test` antes de abrir un pull request.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Estructura del proyecto
 
-## How can I deploy this project?
+```
+src/
+  components/        // UI reutilizable, drawer de Navia y boton flotante
+  pages/             // Vistas de la aplicacion (Index y NotFound)
+  hooks/             // Hooks personalizados
+  lib/               // Utilidades como helpers de estilos
+```
 
-Simply open [Lovable](https://lovable.dev/projects/ac11c98f-ad20-41e1-89a9-9b4d782538f6) and click on Share -> Publish.
+`App.tsx` configura el arbol principal: React Router controla las rutas, TanStack Query prepara la cache y los proveedores de tooltips y toasts envuelven la experiencia.
 
-## Can I connect a custom domain to my Lovable project?
+## Flujo de trabajo sugerido
 
-Yes, you can!
+1. Crear una rama de feature o fix.
+2. Implementar cambios y cubrirlos con pruebas cuando aplique.
+3. Ejecutar `npm run lint && npm run typecheck && npm run test`.
+4. Abrir pull request describiendo el impacto en la experiencia de Navia.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Futuras mejoras propuestas
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Integrar fuentes reales de datos para las acciones del drawer.
+- Conectar autenticacion para personalizar el flujo de usuarios recurrentes.
+- Añadir pruebas e2e que cubran el drawer y las interacciones principales.
+
+## Licencia
+
+Este repositorio no declara una licencia publica. Consulta al equipo de Navia antes de compartir o reutilizar el codigo fuera de la organizacion.
