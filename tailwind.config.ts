@@ -47,6 +47,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        drawer: {
+          DEFAULT: "hsl(var(--drawer-bg))",
+        },
+        "floating-button": "hsl(var(--floating-button))",
+        "button-primary": "hsl(var(--button-primary))",
+        "button-secondary": "hsl(var(--button-secondary))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
