@@ -6,6 +6,7 @@ interface ActionViewProps {
   onBack: () => void;
   promptText?: string;
   responseText?: string;
+  references?: Array<{ label: string; url?: string | null }>;
 }
 
 export const ActionView = ({
@@ -13,6 +14,7 @@ export const ActionView = ({
   onBack,
   promptText,
   responseText,
+  references,
 }: ActionViewProps) => {
   if (responseText) {
     return (
@@ -29,6 +31,34 @@ export const ActionView = ({
             <p className="text-sm whitespace-pre-line italic opacity-90">
               {responseText}
             </p>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <p className="text-sm font-medium">Rutas sugeridas:</p>
+            {references && references.length > 0 ? (
+              <ul className="space-y-2 text-sm">
+                {references.map((reference, index) => (
+                  <li key={`${reference.label}-${index}`} className="italic opacity-90">
+                    {reference.url ? (
+                      <a
+                        href={reference.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-2 hover:text-white"
+                      >
+                        {reference.label}
+                      </a>
+                    ) : (
+                      reference.label
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm italic opacity-70">
+                Sin referencias disponibles para esta respuesta.
+              </p>
+            )}
           </div>
         </div>
 
