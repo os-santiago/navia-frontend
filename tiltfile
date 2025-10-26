@@ -1,0 +1,25 @@
+# Build Navia frontend container image
+docker_build('navia/frontend:latest', '.')
+
+# Create Navia namespace
+namespace = """
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: navia
+"""
+k8s_yaml(blob(namespace))
+
+# Build helm chart to deploy Navia Gateway
+yaml = helm('./helm', 'navia-frontend', 'navia', set=[
+    'fullnameOverride=navia-frontend',
+    'image.repository=navia/frontend',
+    'image.tag=latest',
+    'global.security.allowInsecureImages=true'
+])
+
+# Apply Navia Gateway YAMLs
+k8s_yaml(yaml)
+
+# Port forward Navia Gateway to port 8080
+k8s_resource('navia-frontend', port_forwards=8080)
