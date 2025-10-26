@@ -10,12 +10,12 @@ RUN npm ci
 
 # Copy the remainder of the project and run the Vite build.
 COPY . .
-RUN npm run build
+RUN npm run build -- --base=/navia/
 
-# Runtime stage: serve the built assets with Nginx.
-FROM nginx:alpine AS runner
+# Runtime stage: serve the upstream page enhanced with Navia via OpenResty (Nginx + Lua).
+FROM openresty/openresty:1.25.3.1-alpine AS runner
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/navia
 
-EXPOSE 80
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
