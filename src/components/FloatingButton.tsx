@@ -36,7 +36,7 @@ export const FloatingButton = ({ onClick }: FloatingButtonProps) => {
   return (
     <motion.button
       onClick={onClick}
-      className="fixed bottom-6 right-6 bg-[hsl(var(--floating-button))] text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 z-50 hover:shadow-xl transition-shadow"
+      className="fixed bottom-6 right-6 bg-[hsl(var(--floating-button))] text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 z-[2147483645] hover:shadow-xl transition-shadow"
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       initial={{ opacity: 0, y: 20 }}
