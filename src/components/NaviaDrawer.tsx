@@ -940,15 +940,16 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         lastRedirectUrlRef.current = url;
         return;
       }
-      // TODO: forzando ir a localhost.local para resolver la navegación local, reemplazar esto después
-      lastRedirectUrlRef.current = url;
-      console.log("Redireccionando automáticamente a Navia", url, parsed, parsed.pathname);
-      console.log("Url de redirección: ", "http://localhost.local:8080" + parsed.pathname);
-      lastRedirectUrlRef.current = "http://localhost.local:8080" + parsed.pathname;// url;
-      console.log("Redireccionando automáticamente a Navia", url);
-      window.location.href = "http://localhost.local:8080" + parsed.pathname;// url;
+
+      lastRedirectUrlRef.current = "http://localhost.local:8080" + parsed.pathname // url;
+      console.log("Abriendo destino recomendado por Navia en una pestaña nueva", url);
+      // const opened = window.open(url, "_blank", "noopener,noreferrer");
+      window.location.href = "http://localhost.local:8080" + parsed.pathname; // url;
+      // if (!opened) {
+      //   console.warn("El navegador bloqueó la apertura automática. Solicita abrir manualmente:", url);
+      // }
     } catch (error) {
-      console.error("No se pudo redirigir automáticamente a Navia", error);
+      console.error("No se pudo preparar la apertura automática de Navia", error);
     }
   }, [currentView, isOpen, promptHistory]);
 

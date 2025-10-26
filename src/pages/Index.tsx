@@ -8,7 +8,7 @@ const Index = () => {
   const [isNewUser] = useState(true);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div>
       {/* Botón flotante */}
       <FloatingButton onClick={() => setIsDrawerOpen(true)} />
 
