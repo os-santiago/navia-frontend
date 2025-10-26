@@ -50,6 +50,18 @@ npm run dev
 
 Esto levanta Vite con recarga en caliente (por defecto en http://localhost:5173). El codigo fuente principal vive en `src/`, con `src/pages/Index.tsx` como punto de entrada de la experiencia y componentes compartidos dentro de `src/components/`.
 
+### Configuracion de ElevenLabs
+
+El drawer de Navia puede conectarse con un agente hospedado en ElevenLabs. Para habilitarlo en tu entorno local:
+
+1. Copia el archivo `.env.example` a `.env.local`.
+2. Asigna tus valores reales:
+   - `VITE_ELEVENLABS_API_KEY`: la API Key que genera ElevenLabs (empieza con `xi-...`). Puedes guardarla con o sin el prefijo `Bearer`.
+   - `VITE_ELEVENLABS_AGENT_ID`: el identificador del agente conversacional creado en ElevenLabs.
+3. Reinicia el servidor de desarrollo si ya estaba corriendo.
+
+El frontend lee estas variables en tiempo de compilacion (via `import.meta.env`). Si alguno de los valores falta, el drawer mostrara un mensaje de error antes de intentar conectar con ElevenLabs.
+
 ### Scripts utiles
 
 | Comando | Descripcion |

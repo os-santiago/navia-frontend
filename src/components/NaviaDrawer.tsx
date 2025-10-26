@@ -72,6 +72,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
   const [agentError, setAgentError] = useState<string | null>(null);
   const [isAgentConnecting, setIsAgentConnecting] = useState(false);
   const conversationRef = useRef<ConversationSession | null>(null);
+  const elevenLabsApiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
   const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
   const isInputDisabled = currentView === "processing" || isAgentConnecting;
   const hasPromptHistory = promptHistory.length > 0;
@@ -280,6 +281,13 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       return;
     }
 
+    if (!elevenLabsApiKey) {
+      setAgentError(
+        "Falta la API Key de ElevenLabs. Añádela a las variables de entorno para continuar.",
+      );
+      return;
+    }
+
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setAgentError("Tu navegador no soporta acceso al micrófono requerido para conectar con Navia.");
       return;
@@ -290,9 +298,14 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       setAgentError(null);
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
+      const authorizationHeader = elevenLabsApiKey.startsWith("Bearer ")
+        ? elevenLabsApiKey
+        : `Bearer ${elevenLabsApiKey}`;
+
       const session = await Conversation.startSession({
         agentId,
         connectionType: "webrtc",
+        authorization: authorizationHeader,
         onConnect: () => {
           setAgentError(null);
         },
@@ -321,7 +334,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     } finally {
       setIsAgentConnecting(false);
     }
-  }, [agentId, handleAgentMessage, isAgentConnecting]);
+  }, [agentId, elevenLabsApiKey, handleAgentMessage, isAgentConnecting]);
 
   const handleBackToInitial = () => {
     setCurrentView("initial");
