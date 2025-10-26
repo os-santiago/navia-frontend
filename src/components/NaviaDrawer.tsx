@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mic, Send } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { NewUserView } from "./drawer-views/NewUserView";
 import { RecentPrompts } from "./drawer-views/RecentPrompts";
 import { ActionView } from "./drawer-views/ActionView";
@@ -30,6 +30,18 @@ interface PromptRecord {
   timestamp: string;
 }
 
+type PersistedDrawerState = {
+  currentView?: DrawerView;
+  selectedActionId?: string | null;
+  prefilledPrompt?: string;
+  submittedPrompt?: string;
+  inputValue?: string;
+  promptHistory?: PromptRecord[];
+  isDataLoaded?: boolean;
+};
+
+const NAVIA_DRAWER_STATE_KEY = "navia-drawer-state-v1";
+
 const SurfboardIcon = () => (
   <svg
     width="32"
@@ -58,13 +70,71 @@ const SurfboardIcon = () => (
 );
 
 export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerProps) => {
-  const [currentView, setCurrentView] = useState<DrawerView>("loading");
-  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
-  const [prefilledPrompt, setPrefilledPrompt] = useState("");
-  const [submittedPrompt, setSubmittedPrompt] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [promptHistory, setPromptHistory] = useState<PromptRecord[]>([]);
+  const persistedState = useMemo(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(NAVIA_DRAWER_STATE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") {
+        return null;
+      }
+
+      const state: PersistedDrawerState = {};
+      if (typeof parsed.currentView === "string") {
+        state.currentView = parsed.currentView as DrawerView;
+      }
+
+      state.selectedActionId =
+        typeof parsed.selectedActionId === "string" ? parsed.selectedActionId : null;
+      state.prefilledPrompt =
+        typeof parsed.prefilledPrompt === "string" ? parsed.prefilledPrompt : "";
+      state.submittedPrompt =
+        typeof parsed.submittedPrompt === "string" ? parsed.submittedPrompt : "";
+      state.inputValue = typeof parsed.inputValue === "string" ? parsed.inputValue : "";
+      state.isDataLoaded = Boolean(parsed.isDataLoaded);
+
+      if (Array.isArray(parsed.promptHistory)) {
+        state.promptHistory = parsed.promptHistory.filter(
+          (entry: unknown): entry is PromptRecord => {
+            if (!entry || typeof entry !== "object") {
+              return false;
+            }
+
+            const record = entry as Record<string, unknown>;
+            return (
+              typeof record.prompt === "string" &&
+              typeof record.response === "string" &&
+              typeof record.actionId === "string" &&
+              typeof record.timestamp === "string"
+            );
+          },
+        );
+      }
+
+      return state;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [currentView, setCurrentView] = useState<DrawerView>(persistedState?.currentView ?? "loading");
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(
+    persistedState?.selectedActionId ?? null,
+  );
+  const [prefilledPrompt, setPrefilledPrompt] = useState(persistedState?.prefilledPrompt ?? "");
+  const [submittedPrompt, setSubmittedPrompt] = useState(persistedState?.submittedPrompt ?? "");
+  const [inputValue, setInputValue] = useState(persistedState?.inputValue ?? "");
+  const [isDataLoaded, setIsDataLoaded] = useState(persistedState?.isDataLoaded ?? false);
+  const [promptHistory, setPromptHistory] = useState<PromptRecord[]>(
+    persistedState?.promptHistory ?? [],
+  );
   const [featureModalConfig, setFeatureModalConfig] = useState<FeatureModalConfig | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
   const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -217,6 +287,35 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       clearProcessingTimeout();
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const stateToPersist: PersistedDrawerState = {
+        currentView,
+        selectedActionId,
+        prefilledPrompt,
+        submittedPrompt,
+        inputValue,
+        promptHistory,
+        isDataLoaded,
+      };
+      window.localStorage.setItem(NAVIA_DRAWER_STATE_KEY, JSON.stringify(stateToPersist));
+    } catch {
+      // Storage may be unavailable (e.g., private browsing); ignore persistence failures.
+    }
+  }, [
+    currentView,
+    selectedActionId,
+    prefilledPrompt,
+    submittedPrompt,
+    inputValue,
+    promptHistory,
+    isDataLoaded,
+  ]);
 
   return (
     <AnimatePresence>
