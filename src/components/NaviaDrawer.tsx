@@ -408,7 +408,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
               `${ELEVENLABS_API_BASE_URL}/v1/convai/knowledge-base/documents/${encodeURIComponent(docId)}?agent_id=${encodeURIComponent(agentId)}`,
               {
                 headers: {
-                  // Authorization: authorizationHeader,
+                  // 'Access-Control-Allow-Origin': '',
+                  Authorization: authorizationHeader,
                   Accept: "application/json",
                 },
               },
@@ -455,7 +456,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         `${ELEVENLABS_API_BASE_URL}/v1/convai/conversations/${conversationId}`,
         {
           headers: {
-            // Authorization: authorizationHeader,
+            // 'Access-Control-Allow-Origin': '*',
+            Authorization: authorizationHeader,
             Accept: "application/json",
           },
         },
@@ -667,7 +669,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       setPromptError(null);
       setAgentError(null);
       setCurrentView("action");
-      void refreshConversationState();
+      // void refreshConversationState();
     },
     [refreshConversationState, submittedPrompt],
   );
@@ -938,10 +940,13 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         lastRedirectUrlRef.current = url;
         return;
       }
-
+      // TODO: forzando ir a localhost.local para resolver la navegación local, reemplazar esto después
       lastRedirectUrlRef.current = url;
+      console.log("Redireccionando automáticamente a Navia", url, parsed, parsed.pathname);
+      console.log("Url de redirección: ", "http://localhost.local:8080" + parsed.pathname);
+      lastRedirectUrlRef.current = "http://localhost.local:8080" + parsed.pathname;// url;
       console.log("Redireccionando automáticamente a Navia", url);
-      window.location.href = url;
+      window.location.href = "http://localhost.local:8080" + parsed.pathname;// url;
     } catch (error) {
       console.error("No se pudo redirigir automáticamente a Navia", error);
     }
