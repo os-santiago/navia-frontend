@@ -62,6 +62,7 @@ interface PromptRecord {
   actionId: string;
   timestamp: string;
   references?: DocumentSuggestion[];
+  destinationUrl?: string | null;
 }
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -144,6 +145,22 @@ const latestAgentMessageFromTranscript = (transcript: unknown[]): string | null 
   }
 
   return null;
+};
+
+const extractTrailingUrl = (text: string | null | undefined): string | null => {
+  if (!text) {
+    return null;
+  }
+
+  const trimmed = text.trim();
+  const match = trimmed.match(/(https?:\/\/[^\s)]+)\s*$/i);
+  if (!match) {
+    return null;
+  }
+
+  const raw = match[1];
+  const cleaned = raw.replace(/[.,!?)]*$/, "");
+  return cleaned.length > 0 ? cleaned : null;
 };
 
 const extractDocumentReferencesFromTranscript = (
@@ -321,6 +338,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
   const [inputValue, setInputValue] = useState("");
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [promptHistory, setPromptHistory] = useState<PromptRecord[]>([]);
+  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null);
   const [featureModalConfig, setFeatureModalConfig] = useState<FeatureModalConfig | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
   const [agentError, setAgentError] = useState<string | null>(null);
@@ -329,6 +347,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
   const conversationIdRef = useRef<string | null>(null);
   const metadataCacheRef = useRef<Map<string, DocumentMetadata | null>>(new Map());
   const transcriptRequestIdRef = useRef(0);
+  const lastRedirectUrlRef = useRef<string | null>(null);
   const elevenLabsApiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
   const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
   const authorizationHeader = useMemo(() => {
@@ -338,7 +357,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
 
     return elevenLabsApiKey.startsWith("Bearer ")
       ? elevenLabsApiKey
-      : `Bearer ${elevenLabsApiKey}`;
+      : `${elevenLabsApiKey}`;
   }, [elevenLabsApiKey]);
   const isInputDisabled = currentView === "processing" || isAgentConnecting;
   const hasPromptHistory = promptHistory.length > 0;
@@ -389,7 +408,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
               `${ELEVENLABS_API_BASE_URL}/v1/convai/knowledge-base/documents/${encodeURIComponent(docId)}?agent_id=${encodeURIComponent(agentId)}`,
               {
                 headers: {
-                  Authorization: authorizationHeader,
+                  // Authorization: authorizationHeader,
                   Accept: "application/json",
                 },
               },
@@ -436,7 +455,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         `${ELEVENLABS_API_BASE_URL}/v1/convai/conversations/${conversationId}`,
         {
           headers: {
-            Authorization: authorizationHeader,
+            // Authorization: authorizationHeader,
             Accept: "application/json",
           },
         },
@@ -489,10 +508,13 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
           });
         }
 
+        const trailingUrl = extractTrailingUrl(agentText ?? current.response);
+        console.log("Url extraída:", trailingUrl);
         updated[lastIndex] = {
           ...current,
           response: agentText ?? current.response,
           references: suggestions,
+          destinationUrl: trailingUrl ?? current.destinationUrl ?? null,
         };
 
         return updated;
@@ -608,7 +630,14 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         }
       }
 
+      const urlCandidate = extractTrailingUrl(text);
+
       setPromptHistory((prev) => {
+        if (prev.length === 0 && submittedPrompt.trim().length === 0) {
+          setWelcomeMessage(text);
+          return prev;
+        }
+
         if (prev.length === 0) {
           return [
             {
@@ -617,6 +646,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
               actionId: "agent",
               timestamp: new Date().toISOString(),
               references: [],
+              destinationUrl: urlCandidate ?? null,
             },
           ];
         }
@@ -628,6 +658,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
           response: text,
           actionId: updated[lastIndex].actionId || "agent",
           references: updated[lastIndex].references,
+          destinationUrl: urlCandidate ?? updated[lastIndex].destinationUrl ?? null,
         };
 
         return updated;
@@ -661,15 +692,18 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     }
 
     try {
+      setWelcomeMessage(null);
       setIsAgentConnecting(true);
       setAgentError(null);
       metadataCacheRef.current.clear();
       transcriptRequestIdRef.current += 1;
+      const authorizationToken = authorizationHeader.replace(/^Bearer\s+/i, "");
 
       const session = await Conversation.startSession({
         agentId,
         connectionType: "websocket",
-        authorization: authorizationHeader,
+        // authorization: authorizationToken,
+        origin: "https://api.elevenlabs.io",
         textOnly: true,
         overrides: {
           conversation: {
@@ -717,6 +751,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     setSubmittedPrompt("");
     setPromptError(null);
     setAgentError(null);
+    lastRedirectUrlRef.current = null;
   };
 
   const handleClearHistory = () => {
@@ -727,6 +762,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     setInputValue("");
     setPromptError(null);
     setAgentError(null);
+    lastRedirectUrlRef.current = null;
   };
 
   const handleSendPrompt = async () => {
@@ -770,6 +806,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
         actionId: actionIdToUse,
         timestamp: new Date().toISOString(),
         references: [],
+        destinationUrl: null,
       },
     ]);
 
@@ -825,6 +862,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     conversationIdRef.current = null;
     metadataCacheRef.current.clear();
     transcriptRequestIdRef.current += 1;
+    lastRedirectUrlRef.current = null;
     if (conversationRef.current) {
       void conversationRef.current.endSession();
       conversationRef.current = null;
@@ -836,6 +874,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       conversationIdRef.current = null;
       metadataCacheRef.current.clear();
       transcriptRequestIdRef.current += 1;
+      lastRedirectUrlRef.current = null;
       if (conversationRef.current) {
         void conversationRef.current.endSession();
         conversationRef.current = null;
@@ -855,12 +894,58 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       conversationIdRef.current = null;
       metadataCache.clear();
       transcriptRequestIdRef.current += 1;
+      lastRedirectUrlRef.current = null;
       if (conversationRef.current) {
         void conversationRef.current.endSession();
         conversationRef.current = null;
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!isOpen) {
+      lastRedirectUrlRef.current = null;
+      return;
+    }
+
+    if (currentView !== "action") {
+      return;
+    }
+
+    const latest = promptHistory[promptHistory.length - 1];
+    if (!latest || !isNonEmptyString(latest.destinationUrl)) {
+      return;
+    }
+
+    const url = latest.destinationUrl.trim();
+    if (lastRedirectUrlRef.current === url) {
+      return;
+    }
+
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1"
+      ) {
+        console.warn("Redirección omitida: destino apunta a localhost", url);
+        lastRedirectUrlRef.current = url;
+        return;
+      }
+
+      lastRedirectUrlRef.current = url;
+      console.log("Redireccionando automáticamente a Navia", url);
+      window.location.href = url;
+    } catch (error) {
+      console.error("No se pudo redirigir automáticamente a Navia", error);
+    }
+  }, [currentView, isOpen, promptHistory]);
 
   const latestPromptRecord = promptHistory[promptHistory.length - 1];
   const latestResponseText = latestPromptRecord?.response?.trim()
@@ -909,31 +994,41 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             <div className="flex-1 overflow-y-auto p-6">
               {currentView === "loading" && <LoadingView />}
               {currentView === "initial" && (
-                effectiveIsNewUser ? (
-                <NewUserView
-                  onActionSelect={handleActionSelect}
-                  onShowFeatureUnavailable={() =>
-                    showFeatureNotAvailable({
-                      description:
-                        "La opción de mostrar más alternativas estará disponible pronto. Sigue explorando otras acciones mientras tanto.",
-                    })
-                  }
-                />
-              ) : (
                 <div className="space-y-6">
-                  <RecentPrompts
-                    prompts={promptHistory.slice(-3).reverse()}
-                    onSelectPrompt={(prompt) => {
-                      setInputValue(prompt);
-                      setPrefilledPrompt(prompt);
-                      setPromptError(null);
-                      setSelectedActionId(null);
-                    }}
-                    onClear={handleClearHistory}
-                  />
+                  {welcomeMessage && (
+                    <div className="rounded-2xl bg-[hsl(var(--button-secondary))] p-6 text-white shadow-lg">
+                      <h3 className="text-lg font-semibold mb-2">Bienvenido a Navia</h3>
+                      <p className="text-sm leading-relaxed whitespace-pre-line opacity-90">
+                        {welcomeMessage}
+                      </p>
+                    </div>
+                  )}
+                  {effectiveIsNewUser ? (
+                    <NewUserView
+                      onActionSelect={handleActionSelect}
+                      onShowFeatureUnavailable={() =>
+                        showFeatureNotAvailable({
+                          description:
+                            "La opción de mostrar más alternativas estará disponible pronto. Sigue explorando otras acciones mientras tanto.",
+                        })
+                      }
+                    />
+                  ) : (
+                    <div className="space-y-6">
+                      <RecentPrompts
+                        prompts={promptHistory.slice(-3).reverse()}
+                        onSelectPrompt={(prompt) => {
+                          setInputValue(prompt);
+                          setPrefilledPrompt(prompt);
+                          setPromptError(null);
+                          setSelectedActionId(null);
+                        }}
+                        onClear={handleClearHistory}
+                      />
+                    </div>
+                  )}
                 </div>
-              )
-            )}
+              )}
               {currentView === "processing" && (
                 <ProcessingView promptText={submittedPrompt || inputValue} />
               )}
