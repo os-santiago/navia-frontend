@@ -82,7 +82,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       ? "Analizando página web"
       : currentView === "initial"
         ? effectiveIsNewUser
-          ? "Opciones de surf para hoy"
+          ? "¿Dónde vamos a surfear hoy?" // "Opciones de surf para hoy"
           : "Tus surfeos anteriores"
         : currentView === "processing"
           ? "Procesando tu prompt"
@@ -228,7 +228,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-black/20 z-40"
+            className="fixed inset-0 bg-black/20 z-[2147483646]"
           />
 
           {/* Drawer */}
@@ -237,7 +237,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 h-full w-full max-w-md bg-[hsl(var(--drawer-bg))] shadow-2xl z-50 flex flex-col"
+            className="fixed right-0 top-0 h-full w-full max-w-md bg-[hsl(var(--drawer-bg))] shadow-2xl z-[2147483647] flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
@@ -255,7 +255,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
               {currentView === "loading" && <LoadingView />}
-              {currentView === "initial" && (
+              {/* {currentView === "initial" && (
                 effectiveIsNewUser ? (
                 <NewUserView
                   onActionSelect={handleActionSelect}
@@ -266,7 +266,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                     })
                   }
                 />
-              ) : (
+              ) : ( */}
+              { effectiveIsNewUser &&
                 <div className="space-y-6">
                   <RecentPrompts
                     prompts={promptHistory.slice(-3).reverse()}
@@ -279,8 +280,9 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                     onClear={handleClearHistory}
                   />
                 </div>
-              )
-            )}
+              }
+            {/*  )
+            )} */}
               {currentView === "processing" && (
                 <ProcessingView promptText={submittedPrompt || inputValue} />
               )}
