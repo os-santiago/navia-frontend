@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mic, Send } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Conversation } from "@elevenlabs/client";
 import { NewUserView } from "./drawer-views/NewUserView";
 import { RecentPrompts } from "./drawer-views/RecentPrompts";
 import { ActionView } from "./drawer-views/ActionView";
-import { getActionContent } from "./drawer-views/actionContent";
 import { LoadingView } from "./drawer-views/LoadingView";
 import { ProcessingView } from "./drawer-views/ProcessingView";
 import { FeatureNotAvailableModal } from "./FeatureNotAvailableModal";
@@ -22,6 +22,8 @@ type FeatureModalConfig = {
   description?: string;
   confirmLabel?: string;
 };
+
+type ConversationSession = Awaited<ReturnType<typeof Conversation.startSession>>;
 
 interface PromptRecord {
   prompt: string;
@@ -67,8 +69,11 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
   const [promptHistory, setPromptHistory] = useState<PromptRecord[]>([]);
   const [featureModalConfig, setFeatureModalConfig] = useState<FeatureModalConfig | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
-  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isInputDisabled = currentView === "processing";
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [isAgentConnecting, setIsAgentConnecting] = useState(false);
+  const conversationRef = useRef<ConversationSession | null>(null);
+  const agentId = import.meta.env.VITE_ELEVENLABS_AGENT_ID;
+  const isInputDisabled = currentView === "processing" || isAgentConnecting;
   const hasPromptHistory = promptHistory.length > 0;
   const effectiveIsNewUser = !hasPromptHistory && isNewUser;
   const promptPlaceholder =
@@ -116,13 +121,6 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     }
   }, [isOpen, isDataLoaded, isNewUser, effectiveIsNewUser, currentView]);
 
-  const clearProcessingTimeout = () => {
-    if (processingTimeoutRef.current) {
-      clearTimeout(processingTimeoutRef.current);
-      processingTimeoutRef.current = null;
-    }
-  };
-
   const handleActionSelect = (actionId: string, actionLabel: string) => {
     setSelectedActionId(actionId);
     setPrefilledPrompt(actionLabel);
@@ -134,11 +132,202 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     setFeatureModalConfig(config ?? {});
   };
 
+  const extractAgentMessage = (message: unknown): { role: string | null; text: string | null } => {
+    if (message == null) {
+      return { role: null, text: null };
+    }
+
+    if (typeof message === "string") {
+      const trimmed = message.trim();
+      return { role: null, text: trimmed.length > 0 ? trimmed : null };
+    }
+
+    const payload = message as Record<string, unknown>;
+    const nested = (payload.message as Record<string, unknown> | undefined) ?? undefined;
+
+    const collectFromUnknown = (value: unknown): string | null => {
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+      }
+
+      if (Array.isArray(value)) {
+        const aggregated = value
+          .map((item) => collectFromUnknown(item))
+          .filter((segment): segment is string => Boolean(segment))
+          .join("\n")
+          .trim();
+
+        return aggregated.length > 0 ? aggregated : null;
+      }
+
+      if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        const directKeys = ["text", "value", "message", "response", "transcript"];
+
+        for (const key of directKeys) {
+          const candidate = record[key];
+          if (typeof candidate === "string") {
+            const trimmed = candidate.trim();
+            if (trimmed.length > 0) {
+              return trimmed;
+            }
+          }
+        }
+
+        if (Array.isArray(record.content)) {
+          const aggregated = record.content
+            .map((item) => collectFromUnknown(item))
+            .filter((segment): segment is string => Boolean(segment))
+            .join("\n")
+            .trim();
+
+          if (aggregated.length > 0) {
+            return aggregated;
+          }
+        }
+      }
+
+      return null;
+    };
+
+    const roleCandidate = (() => {
+      if (typeof payload.role === "string") {
+        return payload.role;
+      }
+      if (typeof payload.from === "string") {
+        return payload.from;
+      }
+      if (nested && typeof nested.role === "string") {
+        return nested.role;
+      }
+      return null;
+    })();
+
+    const candidates: unknown[] = [
+      payload,
+      payload.text,
+      payload.response,
+      payload.content,
+      payload.data,
+      nested,
+      nested?.text,
+      nested?.response,
+      nested?.content,
+    ];
+
+    for (const candidate of candidates) {
+      const text = collectFromUnknown(candidate);
+      if (text) {
+        return { role: roleCandidate, text };
+      }
+    }
+
+    return { role: roleCandidate, text: null };
+  };
+
+  const handleAgentMessage = useCallback(
+    (message: unknown) => {
+      const { role, text } = extractAgentMessage(message);
+      if (!text) {
+        return;
+      }
+
+      const normalizedRole = role?.toLowerCase();
+      if (normalizedRole && ["user", "input"].includes(normalizedRole)) {
+        return;
+      }
+
+      setPromptHistory((prev) => {
+        if (prev.length === 0) {
+          return [
+            {
+              prompt: submittedPrompt,
+              response: text,
+              actionId: "agent",
+              timestamp: new Date().toISOString(),
+            },
+          ];
+        }
+
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        updated[lastIndex] = {
+          ...updated[lastIndex],
+          response: text,
+          actionId: updated[lastIndex].actionId || "agent",
+        };
+
+        return updated;
+      });
+
+      setPromptError(null);
+      setAgentError(null);
+      setCurrentView("action");
+    },
+    [submittedPrompt],
+  );
+
+  const initializeConversation = useCallback(async () => {
+    if (conversationRef.current || isAgentConnecting) {
+      return;
+    }
+
+    if (!agentId) {
+      setAgentError(
+        "No se ha configurado el agente de Navia. Revisa las variables de entorno antes de continuar.",
+      );
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setAgentError("Tu navegador no soporta acceso al micrófono requerido para conectar con Navia.");
+      return;
+    }
+
+    try {
+      setIsAgentConnecting(true);
+      setAgentError(null);
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const session = await Conversation.startSession({
+        agentId,
+        connectionType: "webrtc",
+        onConnect: () => {
+          setAgentError(null);
+        },
+        onDisconnect: () => {
+          conversationRef.current = null;
+        },
+        onMessage: (message) => {
+          handleAgentMessage(message);
+        },
+        onModeChange: (mode) => {
+          console.log("Estado del agente de Navia:", mode.mode);
+        },
+        onError: (error) => {
+          console.error("Error en la sesión de Navia", error);
+          setAgentError("Ocurrió un problema con la conexión al agente de Navia. Intenta nuevamente.");
+          conversationRef.current = null;
+        },
+      });
+
+      conversationRef.current = session;
+    } catch (error) {
+      console.error("No fue posible iniciar la conversación con Navia", error);
+      setAgentError(
+        "No pudimos conectar con Navia. Verifica los permisos del micrófono e inténtalo otra vez.",
+      );
+    } finally {
+      setIsAgentConnecting(false);
+    }
+  }, [agentId, handleAgentMessage, isAgentConnecting]);
+
   const handleBackToInitial = () => {
-    clearProcessingTimeout();
     setCurrentView("initial");
     setSubmittedPrompt("");
     setPromptError(null);
+    setAgentError(null);
   };
 
   const handleClearHistory = () => {
@@ -148,9 +337,10 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     setSubmittedPrompt("");
     setInputValue("");
     setPromptError(null);
+    setAgentError(null);
   };
 
-  const handleSendPrompt = () => {
+  const handleSendPrompt = async () => {
     const trimmedPrompt = inputValue.trim();
     if (!trimmedPrompt) {
       return;
@@ -162,36 +352,66 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       return;
     }
 
+    setAgentError(null);
+    if (!conversationRef.current) {
+      if (!isAgentConnecting) {
+        void initializeConversation();
+      }
+      setPromptError(
+        "Estamos conectando con Navia. Intenta enviar tu consulta nuevamente en unos segundos.",
+      );
+      return;
+    }
+
     const actionIdToUse = selectedActionId ?? "custom";
 
     setSubmittedPrompt(trimmedPrompt);
     if (selectedActionId !== actionIdToUse) {
       setSelectedActionId(actionIdToUse);
     }
+    setPrefilledPrompt("");
     setInputValue("");
-    clearProcessingTimeout();
     setCurrentView("processing");
-    processingTimeoutRef.current = setTimeout(() => {
-      const content = getActionContent(actionIdToUse, trimmedPrompt);
-      setPromptHistory((prev) => [
-        ...prev,
-        {
-          prompt: trimmedPrompt,
-          response: content.description,
-          actionId: actionIdToUse,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-      setCurrentView("action");
-      processingTimeoutRef.current = null;
-    }, 1200);
     setPromptError(null);
+    setPromptHistory((prev) => [
+      ...prev,
+      {
+        prompt: trimmedPrompt,
+        response: "",
+        actionId: actionIdToUse,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+
+    try {
+      await conversationRef.current.sendUserMessage(trimmedPrompt);
+    } catch (error) {
+      console.error("No se pudo enviar el mensaje a Navia", error);
+      setAgentError("No pudimos enviar tu mensaje a Navia. Revisa tu conexión e inténtalo nuevamente.");
+      setPromptHistory((prev) => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        updated[lastIndex] = {
+          ...updated[lastIndex],
+          response:
+            "No pudimos enviar tu mensaje a Navia. Revisa tu conexión e inténtalo nuevamente.",
+        };
+        return updated;
+      });
+      setCurrentView("action");
+    }
   };
 
   const handlePromptChange = (value: string) => {
     setInputValue(value);
     if (promptError) {
       setPromptError(null);
+    }
+    if (agentError) {
+      setAgentError(null);
     }
 
     if (value === "") {
@@ -210,13 +430,41 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     onClose();
     setFeatureModalConfig(null);
     setPromptError(null);
+    setAgentError(null);
+    setIsAgentConnecting(false);
+    if (conversationRef.current) {
+      void conversationRef.current.endSession();
+      conversationRef.current = null;
+    }
   };
 
   useEffect(() => {
+    if (!isOpen) {
+      if (conversationRef.current) {
+        void conversationRef.current.endSession();
+        conversationRef.current = null;
+      }
+      return;
+    }
+
+    if (!conversationRef.current && !isAgentConnecting) {
+      void initializeConversation();
+    }
+  }, [initializeConversation, isAgentConnecting, isOpen]);
+
+  useEffect(() => {
     return () => {
-      clearProcessingTimeout();
+      if (conversationRef.current) {
+        void conversationRef.current.endSession();
+        conversationRef.current = null;
+      }
     };
   }, []);
+
+  const latestPromptRecord = promptHistory[promptHistory.length - 1];
+  const latestResponseText = latestPromptRecord?.response?.trim()
+    ? latestPromptRecord.response
+    : undefined;
 
   return (
     <AnimatePresence>
@@ -288,7 +536,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                 <ActionView
                   action={selectedActionId ?? "custom"}
                   onBack={handleBackToInitial}
-                  promptText={submittedPrompt}
+                  promptText={latestPromptRecord?.prompt ?? submittedPrompt}
+                  responseText={latestResponseText}
                 />
               )}
             </div>
@@ -318,13 +567,11 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     <button
-                      className="p-2 hover:bg-accent rounded-lg transition-colors"
-                      onClick={() =>
-                        showFeatureNotAvailable({
-                          description:
-                            "La funcionalidad de micrófono aún no está implementada. Próximamente podrás dictar tus instrucciones desde aquí.",
-                        })
-                      }
+                      type="button"
+                      className="p-2 hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => void initializeConversation()}
+                      disabled={isAgentConnecting}
+                      aria-label="Reconectar con Navia"
                     >
                       <Mic className="w-5 h-5" />
                     </button>
@@ -342,6 +589,14 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                   <p id="prompt-error" className="text-sm text-destructive">
                     {promptError}
                   </p>
+                )}
+                {isAgentConnecting && (
+                  <p className="text-xs text-muted-foreground">
+                    Conectando con Navia...
+                  </p>
+                )}
+                {agentError && (
+                  <p className="text-sm text-destructive">{agentError}</p>
                 )}
               </div>
             )}
