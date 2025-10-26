@@ -288,15 +288,9 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
       return;
     }
 
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setAgentError("Tu navegador no soporta acceso al micrófono requerido para conectar con Navia.");
-      return;
-    }
-
     try {
       setIsAgentConnecting(true);
       setAgentError(null);
-      await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const authorizationHeader = elevenLabsApiKey.startsWith("Bearer ")
         ? elevenLabsApiKey
@@ -304,7 +298,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
 
       const session = await Conversation.startSession({
         agentId,
-        connectionType: "webrtc",
+        connectionType: "websocket",
         authorization: authorizationHeader,
         onConnect: () => {
           setAgentError(null);
@@ -329,7 +323,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
     } catch (error) {
       console.error("No fue posible iniciar la conversación con Navia", error);
       setAgentError(
-        "No pudimos conectar con Navia. Verifica los permisos del micrófono e inténtalo otra vez.",
+        "No pudimos conectar con Navia. Intenta nuevamente en unos segundos.",
       );
     } finally {
       setIsAgentConnecting(false);
