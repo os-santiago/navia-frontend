@@ -1009,7 +1009,7 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                       </p>
                     </div>
                   )}
-                  {effectiveIsNewUser ? (
+                  {/* {effectiveIsNewUser ? (
                     <NewUserView
                       onActionSelect={handleActionSelect}
                       onShowFeatureUnavailable={() =>
@@ -1019,7 +1019,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                         })
                       }
                     />
-                  ) : (
+                  ) : ( */}
+                  {effectiveIsNewUser &&
                     <div className="space-y-6">
                       <RecentPrompts
                         prompts={promptHistory.slice(-3).reverse()}
@@ -1032,7 +1033,8 @@ export const NaviaDrawer = ({ isOpen, onClose, isNewUser = true }: NaviaDrawerPr
                         onClear={handleClearHistory}
                       />
                     </div>
-                  )}
+                  }
+                  {/*})}*/}
                 </div>
               )}
               {currentView === "processing" && (
