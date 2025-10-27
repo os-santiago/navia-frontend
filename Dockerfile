@@ -4,6 +4,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Identificador del agente conversacional en ElevenLabs.
+ARG VITE_ELEVENLABS_API_KEY
+ARG VITE_ELEVENLABS_AGENT_ID
+
 # Install dependencies with reliable layer caching.
 COPY package.json package-lock.json ./
 RUN npm ci
